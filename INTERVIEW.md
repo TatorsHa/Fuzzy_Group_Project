@@ -9,4 +9,4 @@
 5. What do you think of a mood based approach to selecting books?
 6. What do you think about the selecetion of moods? Is it too overwhelming? Is something missing?
 
-
+Note down the user inputs for searching.
