@@ -50,6 +50,22 @@ def build_fuzzy_model(normalized_data, n_clusters=4):
     )
     return cntr, u, fpc
 
+def evaluate_fpc_without_analysis(normalized_df, k_min,k_max):
+    fpcs = []
+    silhouettes = []
+    ks = range(k_min,k_max+1)
+    for k in ks:
+        _, u, fpc = build_fuzzy_model(normalized_df,n_clusters=k)
+        labels = np.argmax(u,axis=0)
+        fpcs.append(fpc)
+        silhouettes.append(silhouette_score(normalized_df,labels))
+    
+    best_k_fpc = ks[np.argmax(fpcs)]
+    best_k_silouhette = ks[np.argmax(silhouettes)]
+    
+    #NOTE: choose methode to return best k number!!!!!
+    return best_k_fpc
+
 #find best nbr of clusters
 def evaluate_fpc(normalized_df, k_min,k_max):
     fpcs = []
@@ -129,8 +145,9 @@ def encode_user_input(user_input, feature_names, adventurous_weight=0.4):
 
     return mood_vec.reshape(1,-1)
 
-def scale_user_input(feature_vec, scaler):
-    return scaler.transform(feature_vec)
+def scale_user_input(feature_vec, scaler, feature_name):
+    df = pd.DataFrame(feature_vec, columns=feature_name)
+    return scaler.transform(df)
 
 def predict_cluster(user_input, centers):
     data_T = user_input.T
@@ -179,4 +196,66 @@ def recommend_books(df, memberships, cluster_index, book_pref_ctrl, top_k=10, us
         recs = df.sort_values("cluster_strenght", ascending=False)
         return recs.head(top_k)
     
+def recs_pipeline(user_input):
+    df_raw, normalized_df, scaler, feat_names = load_input("./book_list.csv", adventurous_weight=0)
+    # training
+    centers, memberships, fpc = build_fuzzy_model(normalized_df, n_clusters=4)
+
+    # input fuzzy variables
+    book_len = ctrl.Antecedent(np.arange(0,3,1), "book_len")
+    book_pace = ctrl.Antecedent(np.arange(0,3,1), "book_pace")
+
+    # output fuzzy variable
+    preference = ctrl.Consequent(np.arange(0,11,1), "preference")
+
+    # membership functions
+    book_len["short"] = fuzz.trimf(book_len.universe, [0,0,1])
+    book_len["medium"] = fuzz.trimf(book_len.universe, [0,1,2])
+    book_len["long"] = fuzz.trimf(book_len.universe, [1,2,2])
+
+    book_pace["slow"] = fuzz.trimf(book_pace.universe, [0,0,1])
+    book_pace["medium"] = fuzz.trimf(book_pace.universe, [0,1,2])
+    book_pace["fast"] = fuzz.trimf(book_pace.universe, [1,2,2])
+
+    preference["low"] = fuzz.trimf(preference.universe, [0,0,5])
+    preference["medium"] = fuzz.trimf(preference.universe, [0,5,10])
+    preference["high"] = fuzz.trimf(preference.universe, [5,10,10])
+
+    # fuzzy rules
+    rule1 = ctrl.Rule(book_len["short"] & book_pace["fast"], preference["high"])
+    rule2 = ctrl.Rule(book_len["short"] & book_pace["medium"], preference["medium"])
+    rule3 = ctrl.Rule(book_len["short"] & book_pace["slow"], preference["low"])
+
+    rule4 = ctrl.Rule(book_len["medium"] & book_pace["fast"], preference["medium"])
+    rule5 = ctrl.Rule(book_len["medium"] & book_pace["medium"], preference["high"])
+    rule6 = ctrl.Rule(book_len["medium"] & book_pace["slow"], preference["medium"])
+
+    rule7 = ctrl.Rule(book_len["long"] & book_pace["fast"], preference["low"])
+    rule8 = ctrl.Rule(book_len["long"] & book_pace["medium"], preference["medium"])
+    rule9 = ctrl.Rule(book_len["long"] & book_pace["slow"], preference["high"])
+
+    # controller
+    book_pref_ctrl = ctrl.ControlSystem([
+        rule1, rule2, rule3,
+        rule4, rule5, rule6,
+        rule7, rule8, rule9
+    ])
+
+    book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
+
+
+    best_k = evaluate_fpc_without_analysis(normalized_df, k_min=6, k_max=12)
+    centers,memberships, fpc = build_fuzzy_model(normalized_df,best_k)
     
+    user = user_input
+    user_len = user[2]
+    user_pace = user[4]
+    fv = encode_user_input(user, feat_names, adventurous_weight=0)
+    fv_scaled = scale_user_input(fv,scaler, feat_names)
+    cluster_index, u = predict_cluster(fv_scaled, centers)
+
+    recommendations = recommend_books(df_raw, memberships, cluster_index, book_pref_ctrl, top_k=10, user_len=user_len, user_pace=user_pace, cluster_weight=0.7, rule_weight=0.3, use_rules = True)
+
+    recs_without_rules = recommend_books(df_raw, memberships, cluster_index, book_pref_ctrl, top_k=10, user_len=user_len, user_pace=user_pace, cluster_weight=0.7, rule_weight=0.3, use_rules = False)
+ 
+    return recommendations, recs_without_rules
