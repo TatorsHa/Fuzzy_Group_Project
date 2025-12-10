@@ -1,0 +1,31 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36" version="29.0.3">
+  <diagram name="Seite-1" id="8owXmO9Rfi8SBACHeBCF">
+    <mxGraphModel dx="1410" dy="750" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-4" value="Algorithm" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="480" width="720" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-6" value="1. Moods/Pace" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="540" width="360" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-7" value="Compare Moods from the library with the moods from user input and give each book in the library a score on how well it fits the moods and make a ranking.&lt;br&gt;&lt;br&gt;This is done via Fuzzy Clustering" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="580" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-9" value="2. Further restrictions&amp;nbsp;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="700" width="360" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-10" value="limit the selection by lenght, author, violence to exclude certain books from the ranking&lt;br&gt;&lt;br&gt;This is done via Fuzzy Functions" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="740" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-11" value="2. Result" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="860" width="360" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_coJEDZQ5GqS_KAoxiyY-12" value="Return the top 10 books from the rankings." style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="900" width="360" height="90" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
