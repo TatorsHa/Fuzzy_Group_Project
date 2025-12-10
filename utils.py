@@ -243,11 +243,14 @@ def recs_pipeline(user_input):
 
     book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
 
+    if user_input[5] > 0:
+        best_k = user_input[5]
+    else:
+        best_k = evaluate_fpc_without_analysis(normalized_df, k_min=6, k_max=12)
 
-    best_k = evaluate_fpc_without_analysis(normalized_df, k_min=6, k_max=12)
-    centers,memberships, fpc = build_fuzzy_model(normalized_df,best_k)
+    centers,memberships, fpc = build_fuzzy_model(normalized_df, best_k)
     
-    user = user_input
+    user = user_input[:-1]
     user_len = user[2]
     user_pace = user[4]
     fv = encode_user_input(user, feat_names, adventurous_weight=0)
