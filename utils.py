@@ -1,0 +1,182 @@
+#imports
+import numpy as np
+import pandas as pd
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
+from sklearn.preprocessing import StandardScaler
+import umap
+import matplotlib.pyplot as plt
+import plotly.express as px
+from matplotlib import cm
+
+from sklearn.metrics import silhouette_score
+
+#Load and process data
+def load_input(csv_path, adventurous_weight=0.4):
+    df = pd.read_csv(csv_path)
+    
+
+    mood_cols = [
+        "adventurous", "challenging", "dark","emotional", "funny", "hopeful", "informative", "inspiring", 
+        "lighthearted", "mysterious", "reflective", "relaxing", "sad", "tense"]
+    df["fuzzy_pace"] = df[["paceslow", "pacemedium", "pacefast"]].idxmax(axis=1)
+    df["fuzzy_pace"] = df["fuzzy_pace"].map({"paceslow":"slow", "pacemedium":"medium","pacefast":"fast"})
+    df["fuzzy_len"] =  pd.cut(df["length"], bins=[0,300,499,np.inf], labels=["short","medium","long"])
+
+    #features = df[mood_cols + ["fuzzy_len"] + pace_cols].copy() -> takes moods + len + pace
+    features = df[mood_cols].copy() #-> takes only moods
+    features["adventurous"] *= adventurous_weight
+
+    features_names = list(features.columns)
+    #print(features)
+    
+    #normalize
+    scaler = StandardScaler()
+    normalized_df = scaler.fit_transform(features)
+
+    return df, normalized_df, scaler, features_names
+
+# train fuzzy clustering
+def build_fuzzy_model(normalized_data, n_clusters=4):
+    data_T = normalized_data.T
+
+    cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(
+        data_T,
+        c=n_clusters,
+        m=1.5,
+        error=0.005,
+        maxiter=1000,
+        init=None
+    )
+    return cntr, u, fpc
+
+#find best nbr of clusters
+def evaluate_fpc(normalized_df, k_min,k_max):
+    fpcs = []
+    silhouettes = []
+    ks = range(k_min,k_max+1)
+    for k in ks:
+        _, u, fpc = build_fuzzy_model(normalized_df,n_clusters=k)
+        labels = np.argmax(u,axis=0)
+        fpcs.append(fpc)
+        silhouettes.append(silhouette_score(normalized_df,labels))
+    #plot metrics
+    plt.figure(figsize=(10,4))
+    plt.plot(ks,fpcs,marker="o",label="FPC")
+    plt.plot(ks,silhouettes,marker='x')
+    plt.xlabel("Number of clusters")
+    plt.ylabel("Score")
+    plt.title("Number of cluster analysis")
+    
+    best_k_fpc = ks[np.argmax(fpcs)]
+    best_k_silouhette = ks[np.argmax(silhouettes)]
+    print("Best Number cluster (fpc) = ", best_k_fpc)
+    print("Best Number cluster (silouhette) = ", best_k_silouhette)
+    #NOTE: choose methode to return best k number!!!!!
+    return best_k_fpc
+
+def visualize_clusters(normalized_data, memberships, n_clusters, feature):
+    reducer = umap.UMAP(random_state=42)
+    emb = reducer.fit_transform(normalized_data)
+    cluster_labels = np.argmax(memberships,axis=0)
+    fig = px.scatter(
+        x=emb[:,0],
+        y=emb[:,1],
+        color=cluster_labels.astype(str),
+        #hover_data=[feature.index],
+        hover_data={
+            "title":feature["title"],
+            "index":feature.index,
+        },
+        title="Umpa projection of books (colored by cluster)"
+    )
+    fig.show()
+
+def plot_cluster_centers(cntr, feature_names, scaler, top_n):
+    colors=[]
+    for f in feature_names:
+        if f.startswith("len"):
+            colors.append("red")
+        elif f.startswith("pace"):
+            colors.append("green")
+        else:
+            colors.append("blue")
+
+    plt.figure(figsize=(14,6))
+    for i, center in enumerate(cntr):
+        plt.plot(center, label=f"Cluster {i}",linewidth=2)
+        if scaler:
+            center_orig = scaler.inverse_transform(center.reshape(1,-1))[0]
+        else:
+            center_orig = center
+        top_idx = center_orig.argsort()[::-1][:top_n]
+        top_features = [feature_names[j] for j in top_idx]
+        print(f"Cluster {i} top features: {top_features}")
+    for idx, f in enumerate(feature_names):
+        plt.axvline(x=idx, color=colors[idx],alpha=0.1)
+    plt.xticks(range(len(feature_names)), feature_names, rotation=90)
+    plt.title("Cluster centers(feature importance)")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # convert user input into feature vector
+def encode_user_input(user_input, feature_names, adventurous_weight=0.4):
+    title,author,length,mood_values,pace = user_input
+    mood_dict = dict(zip(["adventurous", "challenging", "dark", "emotional", "funny", "hopeful", "informative",
+                          "inspiring", "lighthearted", "mysterious", "reflective", "relaxing", "sad", "tense"], mood_values))
+    mood_vec = np.array([mood_dict[f] * (adventurous_weight  if  f == "adventurous" else 1.0) for f in feature_names])
+
+    return mood_vec.reshape(1,-1)
+
+def scale_user_input(feature_vec, scaler):
+    return scaler.transform(feature_vec)
+
+def predict_cluster(user_input, centers):
+    data_T = user_input.T
+    u,u0,d,jm,p,fpc = fuzz.cluster.cmeans_predict(
+        test_data=data_T,
+        cntr_trained=centers,
+        m=1.5,
+        error=0.005,
+        maxiter=1000
+    )
+    cluster_index = np.argmax(u,axis=0)[0]
+    return cluster_index, u
+
+def apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl):
+    book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
+
+    prefs = []
+    length_map = {"short":0, "medium":1, "long":2}
+    pace_map = {"slow":0, "medium":1, "fast":2}
+
+    for _, row in df.iterrows():
+        if user_len is not None:
+            book_pref_sim.input["book_len"] = length_map[row["fuzzy_len"]]
+        else:
+            # default in case it's None
+            book_pref_sim.input["book_len"] = 1
+        if user_pace is not None: 
+            book_pref_sim.input["book_pace"] = pace_map[row["fuzzy_pace"]]
+        else:
+            # default in case it's None
+            book_pref_sim.input["book_pace"] = 1
+        book_pref_sim.compute()
+        prefs.append(book_pref_sim.output["preference"])
+    df["fuzzy_preference"] = prefs
+    return df
+
+def recommend_books(df, memberships, cluster_index, book_pref_ctrl, top_k=10, user_len=None, user_pace=None, cluster_weight=0.7, rule_weight=0.3, use_rules=True):
+    df = df.copy()
+    cluster_strenght = memberships[cluster_index]
+    df["cluster_strenght"] = cluster_strenght
+    if use_rules:
+        df = apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl)
+        df["final_score"] = df["cluster_strenght"] * cluster_weight + df["fuzzy_preference"]/10 * rule_weight
+        return df.sort_values("final_score", ascending=False).head(top_k)
+    else:
+        recs = df.sort_values("cluster_strenght", ascending=False)
+        return recs.head(top_k)
+    
+    
