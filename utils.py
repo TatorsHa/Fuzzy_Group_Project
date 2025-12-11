@@ -208,7 +208,7 @@ def recommend_books(
             rating_norm = rating_norm.clip(lower=0.0, upper=1.0)
             df["cluster_strenght"] = df["cluster_strenght"] * rating_norm.values
 
-    elif use_rules:
+    if use_rules:
         df = apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl)
         df["final_score"] = df["cluster_strenght"] * cluster_weight + df["fuzzy_preference"]/10 * rule_weight
 
