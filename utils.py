@@ -184,10 +184,30 @@ def apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl):
     df["fuzzy_preference"] = prefs
     return df
 
-def recommend_books(df, memberships, cluster_index, book_pref_ctrl, top_k=10, user_len=None, user_pace=None, cluster_weight=0.7, rule_weight=0.3, use_rules=True):
+def recommend_books(
+    df,
+    memberships,
+    cluster_index,
+    book_pref_ctrl,
+    top_k=10,
+    user_len=None,
+    user_pace=None,
+    cluster_weight=0.7,
+    rule_weight=0.3,
+    use_rules=True,
+    use_rating=False,
+):
     df = df.copy()
     cluster_strenght = memberships[cluster_index]
     df["cluster_strenght"] = cluster_strenght
+    # If rating mode requested, weight strength by rating/5 and sort by strength only
+    if use_rating:
+        if "rating" in df.columns:
+            rating_norm = pd.to_numeric(df["rating"], errors="coerce").fillna(0.0) / 5.0
+            rating_norm = rating_norm.clip(lower=0.0, upper=1.0)
+            df["cluster_strenght"] = df["cluster_strenght"] * rating_norm.values
+        # In rating mode we ignore fuzzy rules and rank purely by weighted cluster strength
+        return df.sort_values("cluster_strenght", ascending=False).head(top_k)
     if use_rules:
         df = apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl)
         df["final_score"] = df["cluster_strenght"] * cluster_weight + df["fuzzy_preference"]/10 * rule_weight
@@ -257,8 +277,87 @@ def recs_pipeline(user_input):
     fv_scaled = scale_user_input(fv,scaler, feat_names)
     cluster_index, u = predict_cluster(fv_scaled, centers)
 
-    recommendations = recommend_books(df_raw, memberships, cluster_index, book_pref_ctrl, top_k=10, user_len=user_len, user_pace=user_pace, cluster_weight=0.7, rule_weight=0.3, use_rules = True)
+    recommendations = recommend_books(
+        df_raw, memberships, cluster_index, book_pref_ctrl,
+        top_k=10, user_len=user_len, user_pace=user_pace,
+        cluster_weight=0.7, rule_weight=0.3, use_rules=True, use_rating=False,
+    )
 
-    recs_without_rules = recommend_books(df_raw, memberships, cluster_index, book_pref_ctrl, top_k=10, user_len=user_len, user_pace=user_pace, cluster_weight=0.7, rule_weight=0.3, use_rules = False)
+    recs_without_rules = recommend_books(
+        df_raw, memberships, cluster_index, book_pref_ctrl,
+        top_k=10, user_len=user_len, user_pace=user_pace,
+        cluster_weight=0.7, rule_weight=0.3, use_rules=False, use_rating=False,
+    )
+
+    # Third option: rating-weighted (ignores rules, weights by rating/5)
+    recs_with_rating = recommend_books(
+        df_raw, memberships, cluster_index, book_pref_ctrl,
+        top_k=10, user_len=user_len, user_pace=user_pace,
+        cluster_weight=0.7, rule_weight=0.3, use_rules=False, use_rating=True,
+    )
  
-    return recommendations, recs_without_rules
+    return recommendations, recs_without_rules, recs_with_rating
+
+
+def recs_pipeline_rating(user_input):
+    """
+    Pipeline variant that uses rating-weighted cluster strength instead of fuzzy rules.
+    Returns a single DataFrame.
+    """
+    df_raw, normalized_df, scaler, feat_names = load_input("./book_list.csv", adventurous_weight=0)
+
+    # choose number of clusters (optional sixth element in user_input)
+    try:
+        clusters = int(user_input[5]) if len(user_input) > 5 else 0
+    except Exception:
+        clusters = 0
+    if clusters and clusters > 1:
+        best_k = clusters
+    else:
+        best_k = evaluate_fpc_without_analysis(normalized_df, k_min=6, k_max=12)
+
+    centers, memberships, fpc = build_fuzzy_model(normalized_df, best_k)
+
+    # build fuzzy controller (not used for scoring here, but kept for consistency)
+    book_len = ctrl.Antecedent(np.arange(0,3,1), "book_len")
+    book_pace = ctrl.Antecedent(np.arange(0,3,1), "book_pace")
+    preference = ctrl.Consequent(np.arange(0,11,1), "preference")
+    book_len["short"] = fuzz.trimf(book_len.universe, [0,0,1])
+    book_len["medium"] = fuzz.trimf(book_len.universe, [0,1,2])
+    book_len["long"] = fuzz.trimf(book_len.universe, [1,2,2])
+    book_pace["slow"] = fuzz.trimf(book_pace.universe, [0,0,1])
+    book_pace["medium"] = fuzz.trimf(book_pace.universe, [0,1,2])
+    book_pace["fast"] = fuzz.trimf(book_pace.universe, [1,2,2])
+    preference["low"] = fuzz.trimf(preference.universe, [0,0,5])
+    preference["medium"] = fuzz.trimf(preference.universe, [0,5,10])
+    preference["high"] = fuzz.trimf(preference.universe, [5,10,10])
+    rule1 = ctrl.Rule(book_len["short"] & book_pace["fast"], preference["high"])
+    rule2 = ctrl.Rule(book_len["short"] & book_pace["medium"], preference["medium"])
+    rule3 = ctrl.Rule(book_len["short"] & book_pace["slow"], preference["low"])
+    rule4 = ctrl.Rule(book_len["medium"] & book_pace["fast"], preference["medium"])
+    rule5 = ctrl.Rule(book_len["medium"] & book_pace["medium"], preference["high"])
+    rule6 = ctrl.Rule(book_len["medium"] & book_pace["slow"], preference["medium"])
+    rule7 = ctrl.Rule(book_len["long"] & book_pace["fast"], preference["low"])
+    rule8 = ctrl.Rule(book_len["long"] & book_pace["medium"], preference["medium"])
+    rule9 = ctrl.Rule(book_len["long"] & book_pace["slow"], preference["high"])
+    book_pref_ctrl = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9])
+
+    # user vector (ignore clusters entry), convert moods 0–100 to 0–1
+    user = user_input[:-1]
+    user_len = user[2]
+    user_pace = user[4]
+    moods01 = [float(m)/100.0 for m in user[3]]
+    user_fixed = [user[0], user[1], user[2], moods01, user[4]]
+
+    fv = encode_user_input(user_fixed, feat_names, adventurous_weight=0)
+    fv_scaled = scale_user_input(fv, scaler, feat_names)
+    cluster_index, u = predict_cluster(fv_scaled, centers)
+
+    # use_rating=True triggers rating-based branch
+    recs = recommend_books(
+        df_raw, memberships, cluster_index, book_pref_ctrl,
+        top_k=10, user_len=user_len, user_pace=user_pace,
+        cluster_weight=0.7, rule_weight=0.3, use_rules=False,
+        use_rating=True,
+    )
+    return recs
