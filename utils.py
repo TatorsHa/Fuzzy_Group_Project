@@ -184,6 +184,20 @@ def apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl):
     df["fuzzy_preference"] = prefs
     return df
 
+def dynamic_rules(book_len, book_pace, user_len, user_pace, preference):
+    rules = []
+    for l in ["short", "medium", "long"]:
+        for p in ["slow", "medium", "fast"]:
+            # exact match -> high, one match -> medium, no match -> low
+            if l == user_len and p == user_pace:
+                out = preference["high"]
+            elif l == user_len or p == user_pace:
+                out = preference["medium"]
+            else:
+                out = preference["low"]
+            rules.append(ctrl.Rule(book_len[l] & book_pace[p], out))
+    return rules
+
 def recommend_books(
     df,
     memberships,
@@ -192,7 +206,6 @@ def recommend_books(
     top_k=10,
     user_len=None,
     user_pace=None,
-    cluster_weight=0.7,
     rule_weight=0.3,
     use_rules=True,
     use_rating=False,
@@ -210,8 +223,9 @@ def recommend_books(
 
     if use_rules:
         df = apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl)
-        df["final_score"] = df["cluster_strenght"] * cluster_weight + df["fuzzy_preference"]/10 * rule_weight
-
+        df["cluster_norm"] = (df["cluster_strenght"] - df["cluster_strenght"].min())/(df["cluster_strenght"].max()- df["cluster_strenght"].min())
+        df["fuzzy_norm"] = (df["fuzzy_preference"]-df["fuzzy_preference"].min())/(df["fuzzy_preference"].max()-df["fuzzy_preference"].min())
+        df["cluster_strenght"] = (1-rule_weight) * df["cluster_norm"] + rule_weight * df["fuzzy_norm"]
     return df.sort_values("cluster_strenght", ascending=False).head(top_k)
 
     
@@ -241,26 +255,26 @@ def recs_pipeline(user_input):
     preference["high"] = fuzz.trimf(preference.universe, [5,10,10])
 
     # fuzzy rules
-    rule1 = ctrl.Rule(book_len["short"] & book_pace["fast"], preference["high"])
-    rule2 = ctrl.Rule(book_len["short"] & book_pace["medium"], preference["medium"])
-    rule3 = ctrl.Rule(book_len["short"] & book_pace["slow"], preference["low"])
+    #rule1 = ctrl.Rule(book_len["short"] & book_pace["fast"], preference["high"])
+    #rule2 = ctrl.Rule(book_len["short"] & book_pace["medium"], preference["medium"])
+    #rule3 = ctrl.Rule(book_len["short"] & book_pace["slow"], preference["low"])
 
-    rule4 = ctrl.Rule(book_len["medium"] & book_pace["fast"], preference["medium"])
-    rule5 = ctrl.Rule(book_len["medium"] & book_pace["medium"], preference["high"])
-    rule6 = ctrl.Rule(book_len["medium"] & book_pace["slow"], preference["medium"])
+    #rule4 = ctrl.Rule(book_len["medium"] & book_pace["fast"], preference["medium"])
+    #rule5 = ctrl.Rule(book_len["medium"] & book_pace["medium"], preference["high"])
+    #rule6 = ctrl.Rule(book_len["medium"] & book_pace["slow"], preference["medium"])
 
-    rule7 = ctrl.Rule(book_len["long"] & book_pace["fast"], preference["low"])
-    rule8 = ctrl.Rule(book_len["long"] & book_pace["medium"], preference["medium"])
-    rule9 = ctrl.Rule(book_len["long"] & book_pace["slow"], preference["high"])
+    #rule7 = ctrl.Rule(book_len["long"] & book_pace["fast"], preference["low"])
+    #rule8 = ctrl.Rule(book_len["long"] & book_pace["medium"], preference["medium"])
+    #rule9 = ctrl.Rule(book_len["long"] & book_pace["slow"], preference["high"])
 
     # controller
-    book_pref_ctrl = ctrl.ControlSystem([
-        rule1, rule2, rule3,
-        rule4, rule5, rule6,
-        rule7, rule8, rule9
-    ])
+    #book_pref_ctrl = ctrl.ControlSystem([
+    #    rule1, rule2, rule3,
+    #    rule4, rule5, rule6,
+    #    rule7, rule8, rule9
+    #])
 
-    book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
+    #book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
 
     if user_input[5] > 0:
         best_k = user_input[5]
@@ -276,26 +290,36 @@ def recs_pipeline(user_input):
     fv_scaled = scale_user_input(fv,scaler, feat_names)
     cluster_index, u = predict_cluster(fv_scaled, centers)
 
+    #### DYNAMIC RULES ####
+    rules = dynamic_rules(book_len, book_pace, user_len, user_pace, preference)
+    book_pref_ctrl = ctrl.ControlSystem(rules)
+
     recommendations = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
-        cluster_weight=0.7, rule_weight=0.3, use_rules=True, use_rating=False,
+        rule_weight=0.4, use_rules=True, use_rating=False,
     )
 
     recs_without_rules = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
-        cluster_weight=0.7, rule_weight=0.3, use_rules=False, use_rating=False,
+        use_rules=False, use_rating=False,
     )
 
     # Third option: rating-weighted (ignores rules, weights by rating/5)
     recs_with_rating = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
-        cluster_weight=0.7, rule_weight=0.3, use_rules=False, use_rating=True,
+        use_rules=False, use_rating=True,
+    )
+
+    recs_with_rules_nd_ratings = recommend_books(
+        df_raw, memberships, cluster_index, book_pref_ctrl,
+        top_k=10, user_len=user_len, user_pace=user_pace,
+        rule_weight=0.4, use_rules=True, use_rating=True,
     )
  
-    return recommendations, recs_without_rules, recs_with_rating
+    return recommendations, recs_without_rules, recs_with_rating, recs_with_rules_nd_ratings
 
 
 def recs_pipeline_rating(user_input):
@@ -356,7 +380,7 @@ def recs_pipeline_rating(user_input):
     recs = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
-        cluster_weight=0.7, rule_weight=0.3, use_rules=False,
+        rule_weight=0.3, use_rules=False,
         use_rating=True,
     )
     return recs
