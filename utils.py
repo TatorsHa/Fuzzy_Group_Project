@@ -200,21 +200,20 @@ def recommend_books(
     df = df.copy()
     cluster_strenght = memberships[cluster_index]
     df["cluster_strenght"] = cluster_strenght
-    # If rating mode requested, weight strength by rating/5 and sort by strength only
+
+
     if use_rating:
         if "rating" in df.columns:
-            rating_norm = pd.to_numeric(df["rating"], errors="coerce").fillna(0.0) / 5.0
+            rating_norm = pd.to_numeric(df["rating"], errors="coerce").fillna(1.0) / 5.0
             rating_norm = rating_norm.clip(lower=0.0, upper=1.0)
             df["cluster_strenght"] = df["cluster_strenght"] * rating_norm.values
-        # In rating mode we ignore fuzzy rules and rank purely by weighted cluster strength
-        return df.sort_values("cluster_strenght", ascending=False).head(top_k)
-    if use_rules:
+
+    elif use_rules:
         df = apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl)
         df["final_score"] = df["cluster_strenght"] * cluster_weight + df["fuzzy_preference"]/10 * rule_weight
-        return df.sort_values("final_score", ascending=False).head(top_k)
-    else:
-        recs = df.sort_values("cluster_strenght", ascending=False)
-        return recs.head(top_k)
+
+    return df.sort_values("cluster_strenght", ascending=False).head(top_k)
+
     
 def recs_pipeline(user_input):
     df_raw, normalized_df, scaler, feat_names = load_input("./book_list.csv", adventurous_weight=0)
