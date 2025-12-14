@@ -6,7 +6,7 @@ Bookwyrm is a project developed in the context of the Fuzzy Sets class. The goal
 **Standard User:**<br>
 
 1. Run Bookwyrm.ipynb, the requiered libraries can be found in requirments.txt
-2. Insert your custom values or select one of the books at the top to get recommendation. If the "Specify number of clusters" is left at 0 the programm will search for a good amount of clusters to generate, but from experience using 15-20 clusters leads to more intresting and varied results.
+2. Insert your custom values or select one of the books at the top to get recommendation. If the "Specify number of clusters" is left at 0 the programm will search for a good amount of clusters to generate, but from experience using 15-20 clusters leads to more interesting and varied results.
 3. Click on "Get Recommendations". The programm will compute 4 different lists, one list only taking the moods into acount, one list for moods+rules, one list for moods+rating and one list for moods+rules+rating. You can change the inputs at any time and click on "Get Recommendation" again to refresh the book suggestions.
 
 **For testing:**<br>
