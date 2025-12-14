@@ -11,7 +11,7 @@ Bookwyrm is a project developed in the context of the Fuzzy Sets class. The goal
 
 **For testing:**<br>
 <br>
-In the bookwyrm_analysis.ipynb you can see how we tested the programm, including how the clusters are generated.
+In the bookwyrm_analysis.ipynb you can see how we tested the programm, including how the clusters are generated along with some graphs.
 
 ## 1. Problem Identification and Motivation
 
@@ -84,6 +84,12 @@ Setup:<br>
 
 We conducted several interviews with different people, mostly people from which we knew do read fantasy books (7 interviews 14.12.2025). Those interviews can be found under INTERVIEW.md.
 
+General takaways from the interviews:
+- Mood-based book discovery is well received by all interviewee.
+- The algorithm succeeds as a discovery and inspiration tool, not a precision recommender.
+- The recommendation quality is acceptable, but dataset size and diversity are critical and maybe still too small.
+- The algorithm captures moods reasonably well but fails to capture deeper taste preferences, such as: Magic intensity, Subgenres (such as romantic fantasy) and Violence levels
+- Strong preference for higher cluster counts (15-20 clusters) across all interviewee. The higher cluster amounts increases the perceived variety and makes the algorithm results feel more exploratory.
 
 
 # Litterature
