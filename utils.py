@@ -23,14 +23,11 @@ def load_input(csv_path, adventurous_weight=0.4):
     df["fuzzy_pace"] = df["fuzzy_pace"].map({"paceslow":"slow", "pacemedium":"medium","pacefast":"fast"})
     df["fuzzy_len"] =  pd.cut(df["length"], bins=[0,300,499,np.inf], labels=["short","medium","long"])
 
-    #features = df[mood_cols + ["fuzzy_len"] + pace_cols].copy() -> takes moods + len + pace
     features = df[mood_cols].copy() #-> takes only moods
     features["adventurous"] *= adventurous_weight
-
     features_names = list(features.columns)
-    #print(features)
     
-    #normalize
+    #normalize data
     scaler = StandardScaler()
     normalized_df = scaler.fit_transform(features)
 
@@ -50,6 +47,7 @@ def build_fuzzy_model(normalized_data, n_clusters=4):
     )
     return cntr, u, fpc
 
+# find best number of clusters (without plotting, used in the user version)
 def evaluate_fpc_without_analysis(normalized_df, k_min,k_max):
     fpcs = []
     silhouettes = []
@@ -62,11 +60,11 @@ def evaluate_fpc_without_analysis(normalized_df, k_min,k_max):
     
     best_k_fpc = ks[np.argmax(fpcs)]
     best_k_silouhette = ks[np.argmax(silhouettes)]
-    
+
     #NOTE: choose methode to return best k number!!!!!
     return best_k_fpc
 
-#find best nbr of clusters
+# find best nbr of clusters (with plotting)
 def evaluate_fpc(normalized_df, k_min,k_max):
     fpcs = []
     silhouettes = []
@@ -91,6 +89,7 @@ def evaluate_fpc(normalized_df, k_min,k_max):
     #NOTE: choose methode to return best k number!!!!!
     return best_k_fpc
 
+# plot the clusters 
 def visualize_clusters(normalized_data, memberships, n_clusters, feature):
     reducer = umap.UMAP(random_state=42)
     emb = reducer.fit_transform(normalized_data)
@@ -99,7 +98,6 @@ def visualize_clusters(normalized_data, memberships, n_clusters, feature):
         x=emb[:,0],
         y=emb[:,1],
         color=cluster_labels.astype(str),
-        #hover_data=[feature.index],
         hover_data={
             "title":feature["title"],
             "index":feature.index,
@@ -108,6 +106,7 @@ def visualize_clusters(normalized_data, memberships, n_clusters, feature):
     )
     fig.show()
 
+# plot and print where cluster centers are situated (in relation to moods)
 def plot_cluster_centers(cntr, feature_names, scaler, top_n):
     colors=[]
     for f in feature_names:
@@ -136,7 +135,7 @@ def plot_cluster_centers(cntr, feature_names, scaler, top_n):
     plt.tight_layout()
     plt.show()
 
-    # convert user input into feature vector
+# convert user input into feature vector
 def encode_user_input(user_input, feature_names, adventurous_weight=0.4):
     title,author,length,mood_values,pace = user_input
     mood_dict = dict(zip(["adventurous", "challenging", "dark", "emotional", "funny", "hopeful", "informative",
@@ -145,10 +144,12 @@ def encode_user_input(user_input, feature_names, adventurous_weight=0.4):
 
     return mood_vec.reshape(1,-1)
 
+# normalising/scaling user input
 def scale_user_input(feature_vec, scaler, feature_name):
     df = pd.DataFrame(feature_vec, columns=feature_name)
     return scaler.transform(df)
 
+# predicting in which cluster the user input is situatied
 def predict_cluster(user_input, centers):
     data_T = user_input.T
     u,u0,d,jm,p,fpc = fuzz.cluster.cmeans_predict(
@@ -161,6 +162,7 @@ def predict_cluster(user_input, centers):
     cluster_index = np.argmax(u,axis=0)[0]
     return cluster_index, u
 
+# apply fuzzy rules
 def apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl):
     book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
 
@@ -184,6 +186,7 @@ def apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl):
     df["fuzzy_preference"] = prefs
     return df
 
+# build dynamic fuzzy rules so that it is user dependant (based on lenght and pace of books)
 def dynamic_rules(book_len, book_pace, user_len, user_pace, preference):
     rules = []
     for l in ["short", "medium", "long"]:
@@ -198,6 +201,7 @@ def dynamic_rules(book_len, book_pace, user_len, user_pace, preference):
             rules.append(ctrl.Rule(book_len[l] & book_pace[p], out))
     return rules
 
+# recommend 10 books (4 options: 1. just using clustering 2. clustering + fuzzy rules 3. clustering + ratings 4. all together)
 def recommend_books(
     df,
     memberships,
@@ -214,13 +218,14 @@ def recommend_books(
     cluster_strenght = memberships[cluster_index]
     df["cluster_strenght"] = cluster_strenght
 
-
+    # add ratings
     if use_rating:
         if "rating" in df.columns:
             rating_norm = pd.to_numeric(df["rating"], errors="coerce").fillna(1.0) / 5.0
             rating_norm = rating_norm.clip(lower=0.0, upper=1.0)
             df["cluster_strenght"] = df["cluster_strenght"] * rating_norm.values
 
+    # add fuzzy len-pace rules
     if use_rules:
         df = apply_fuzzy_filters(df, user_len, user_pace, book_pref_ctrl)
         df["cluster_norm"] = (df["cluster_strenght"] - df["cluster_strenght"].min())/(df["cluster_strenght"].max()- df["cluster_strenght"].min())
@@ -228,7 +233,7 @@ def recommend_books(
         df["cluster_strenght"] = (1-rule_weight) * df["cluster_norm"] + rule_weight * df["fuzzy_norm"]
     return df.sort_values("cluster_strenght", ascending=False).head(top_k)
 
-    
+# whole pipeline (without graph analysis) for the user-experiences notebook (Bookwyrm.ipynb)
 def recs_pipeline(user_input):
     df_raw, normalized_df, scaler, feat_names = load_input("./book_list.csv", adventurous_weight=0)
     # training
@@ -254,28 +259,6 @@ def recs_pipeline(user_input):
     preference["medium"] = fuzz.trimf(preference.universe, [0,5,10])
     preference["high"] = fuzz.trimf(preference.universe, [5,10,10])
 
-    # fuzzy rules
-    #rule1 = ctrl.Rule(book_len["short"] & book_pace["fast"], preference["high"])
-    #rule2 = ctrl.Rule(book_len["short"] & book_pace["medium"], preference["medium"])
-    #rule3 = ctrl.Rule(book_len["short"] & book_pace["slow"], preference["low"])
-
-    #rule4 = ctrl.Rule(book_len["medium"] & book_pace["fast"], preference["medium"])
-    #rule5 = ctrl.Rule(book_len["medium"] & book_pace["medium"], preference["high"])
-    #rule6 = ctrl.Rule(book_len["medium"] & book_pace["slow"], preference["medium"])
-
-    #rule7 = ctrl.Rule(book_len["long"] & book_pace["fast"], preference["low"])
-    #rule8 = ctrl.Rule(book_len["long"] & book_pace["medium"], preference["medium"])
-    #rule9 = ctrl.Rule(book_len["long"] & book_pace["slow"], preference["high"])
-
-    # controller
-    #book_pref_ctrl = ctrl.ControlSystem([
-    #    rule1, rule2, rule3,
-    #    rule4, rule5, rule6,
-    #    rule7, rule8, rule9
-    #])
-
-    #book_pref_sim = ctrl.ControlSystemSimulation(book_pref_ctrl)
-
     if user_input[5] > 0:
         best_k = user_input[5]
     else:
@@ -290,97 +273,36 @@ def recs_pipeline(user_input):
     fv_scaled = scale_user_input(fv,scaler, feat_names)
     cluster_index, u = predict_cluster(fv_scaled, centers)
 
-    #### DYNAMIC RULES ####
+    # computing dynamic fuzzy rules (lenght, pace)
     rules = dynamic_rules(book_len, book_pace, user_len, user_pace, preference)
     book_pref_ctrl = ctrl.ControlSystem(rules)
 
-    recommendations = recommend_books(
-        df_raw, memberships, cluster_index, book_pref_ctrl,
-        top_k=10, user_len=user_len, user_pace=user_pace,
-        rule_weight=0.4, use_rules=True, use_rating=False,
-    )
-
-    recs_without_rules = recommend_books(
+    # OPTION 1: get recommendations using only the mood-based fuzzy clustering
+    recs_only_clustering = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
         use_rules=False, use_rating=False,
     )
 
-    # Third option: rating-weighted (ignores rules, weights by rating/5)
+    # OPTION 2: get recommendation while adding dynamic fuzzy rules on top of clustering 
+    recs_with_rules = recommend_books(
+        df_raw, memberships, cluster_index, book_pref_ctrl,
+        top_k=10, user_len=user_len, user_pace=user_pace,
+        rule_weight=0.4, use_rules=True, use_rating=False,
+    )
+
+   # OPTION 3: get recommendations using the ratings on top of clustering
     recs_with_rating = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
         use_rules=False, use_rating=True,
     )
 
+    # OPTION 4: get the recommendations using fuzzy rules and ratings on top of clustering
     recs_with_rules_nd_ratings = recommend_books(
         df_raw, memberships, cluster_index, book_pref_ctrl,
         top_k=10, user_len=user_len, user_pace=user_pace,
         rule_weight=0.4, use_rules=True, use_rating=True,
     )
  
-    return recommendations, recs_without_rules, recs_with_rating, recs_with_rules_nd_ratings
-
-
-def recs_pipeline_rating(user_input):
-    """
-    Pipeline variant that uses rating-weighted cluster strength instead of fuzzy rules.
-    Returns a single DataFrame.
-    """
-    df_raw, normalized_df, scaler, feat_names = load_input("./book_list.csv", adventurous_weight=0)
-
-    # choose number of clusters (optional sixth element in user_input)
-    try:
-        clusters = int(user_input[5]) if len(user_input) > 5 else 0
-    except Exception:
-        clusters = 0
-    if clusters and clusters > 1:
-        best_k = clusters
-    else:
-        best_k = evaluate_fpc_without_analysis(normalized_df, k_min=6, k_max=12)
-
-    centers, memberships, fpc = build_fuzzy_model(normalized_df, best_k)
-
-    # build fuzzy controller (not used for scoring here, but kept for consistency)
-    book_len = ctrl.Antecedent(np.arange(0,3,1), "book_len")
-    book_pace = ctrl.Antecedent(np.arange(0,3,1), "book_pace")
-    preference = ctrl.Consequent(np.arange(0,11,1), "preference")
-    book_len["short"] = fuzz.trimf(book_len.universe, [0,0,1])
-    book_len["medium"] = fuzz.trimf(book_len.universe, [0,1,2])
-    book_len["long"] = fuzz.trimf(book_len.universe, [1,2,2])
-    book_pace["slow"] = fuzz.trimf(book_pace.universe, [0,0,1])
-    book_pace["medium"] = fuzz.trimf(book_pace.universe, [0,1,2])
-    book_pace["fast"] = fuzz.trimf(book_pace.universe, [1,2,2])
-    preference["low"] = fuzz.trimf(preference.universe, [0,0,5])
-    preference["medium"] = fuzz.trimf(preference.universe, [0,5,10])
-    preference["high"] = fuzz.trimf(preference.universe, [5,10,10])
-    rule1 = ctrl.Rule(book_len["short"] & book_pace["fast"], preference["high"])
-    rule2 = ctrl.Rule(book_len["short"] & book_pace["medium"], preference["medium"])
-    rule3 = ctrl.Rule(book_len["short"] & book_pace["slow"], preference["low"])
-    rule4 = ctrl.Rule(book_len["medium"] & book_pace["fast"], preference["medium"])
-    rule5 = ctrl.Rule(book_len["medium"] & book_pace["medium"], preference["high"])
-    rule6 = ctrl.Rule(book_len["medium"] & book_pace["slow"], preference["medium"])
-    rule7 = ctrl.Rule(book_len["long"] & book_pace["fast"], preference["low"])
-    rule8 = ctrl.Rule(book_len["long"] & book_pace["medium"], preference["medium"])
-    rule9 = ctrl.Rule(book_len["long"] & book_pace["slow"], preference["high"])
-    book_pref_ctrl = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9])
-
-    # user vector (ignore clusters entry), convert moods 0–100 to 0–1
-    user = user_input[:-1]
-    user_len = user[2]
-    user_pace = user[4]
-    moods01 = [float(m)/100.0 for m in user[3]]
-    user_fixed = [user[0], user[1], user[2], moods01, user[4]]
-
-    fv = encode_user_input(user_fixed, feat_names, adventurous_weight=0)
-    fv_scaled = scale_user_input(fv, scaler, feat_names)
-    cluster_index, u = predict_cluster(fv_scaled, centers)
-
-    # use_rating=True triggers rating-based branch
-    recs = recommend_books(
-        df_raw, memberships, cluster_index, book_pref_ctrl,
-        top_k=10, user_len=user_len, user_pace=user_pace,
-        rule_weight=0.3, use_rules=False,
-        use_rating=True,
-    )
-    return recs
+    return recs_only_clustering, recs_with_rules, recs_with_rating, recs_with_rules_nd_ratings
