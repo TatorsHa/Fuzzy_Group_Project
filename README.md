@@ -83,7 +83,8 @@ Setup:<br>
 3. For the **recomendation with rating** we simply multiply the cluster_strenght of each book with their rating (0-5) divided by 5.
 
 ### Cluster analysis
-Here are some examples of graphs generated in our bookwyrm_analysis.ipynb notebook for 7 and 20 clusters:
+In our bookwyrm_analysis.ipynb notebook we generated graphs to help us during testing. We have a UMAP projection of all of the clusters with each book separation (interactive in the notebook), this is used to see the distribution of books across clusters. We also used a graph showing the repartion of all of the cluster centers realatively to their most dominant moods (we also print the top moods present in each clusters in the notebook).
+Here are some examples of graphs generated for 7 and 20 clusters:
 
 #### 7 clusters
 ![7 clusters visualization](images/7_clusters.png)
