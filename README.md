@@ -24,7 +24,7 @@ This led to the creation of a simple prototype which was shown in the presentati
 
 With this new idea we created a new prototype. The prototype is going to make use of fuzzy clustering to compare the moods ratings of the books with either a questionnaire or the users library. 
 
-For the questionnaire we have two ideas at this moment, which will have to be evaluated.<br>
+For the questionnaire we had two ideas, which will have to be evaluated.<br>
 - The users will be asked for each mood/pace how they feel about it and with that result we are going to calculate a vector to compare with our library.<br>
 - The users will get a more fuzzy questionnaire where each question can give rating to more then one mood. The results of the questionnaire will then be aggregated to calculate a vector to compare with our library. This was scrapped during the implemtation due to being to complicated and weird to use.
 
@@ -35,11 +35,11 @@ For the questionnaire we have two ideas at this moment, which will have to be ev
 The dataset used in this project comes from [The StoryGraph](https://app.thestorygraph.com/). This website provides detailed information and analytics about books. It aggregates user-generated impressions and reading experiences. In particular, it provides statistics on how readers felt about each book, including:
 - **Moods** (reflective, emotional, adventurous,...)
 - **Pace** (slow, medium, fast)
-- **Additional attributes** such as genre tags, content warnings, length and community ratings.
+- **Additional attributes** such as genre tags, length and community ratings.
   
 These features make The StoryGraph the perfect resource for building recommendation or classification systems.
 
-The data is stored in a CSV file with currently the following categories:
+The data is stored in a CSV file with the following categories:
 
 **Main:**
 - Title
@@ -66,6 +66,9 @@ The data is stored in a CSV file with currently the following categories:
 - Slow
 - Medium
 - Fast
+
+**Ratings**
+- Rating on a score from 0-5
 
 We gathered the data of 100 books from the website. If the book is part of a series we only ever took the first book of that series. You can check-out the data in book_list.csv.
 
