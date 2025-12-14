@@ -1,5 +1,5 @@
 # Bookwyrm
-Bookwyrm is a project developed in the context of the Fuzzy Sets class. The goal is to make a small app or plugin to help people find new fantasy book suggestions.
+Bookwyrm is a project developed by Morgane Kappeler and Hans-Andrea Danuser in the context of the Fuzzy Sets class. The goal is to make a small app or plugin to help people find new fantasy book suggestions.
 
 ## 0. How to use the programm
 
@@ -107,3 +107,5 @@ General takaways from the interviews:
 # Litterature
 - Brocke, Jan vom & Hevner, Alan & Maedche, Alexander. (2020). Introduction to Design Science Research. 10.1007/978-3-030-46781-4_1.
 - The StoryGraph website [https://app.thestorygraph.com/](https://app.thestorygraph.com/), © 2025 The StoryGraph Ltd.
+
+Morgane Kappeler and Hans-Andrea Danuser, Autumn 2025, Fuzzy sets
