@@ -82,13 +82,15 @@ Setup:<br>
 2. For the **recomendation with rules** we use fuzzy rules to give the books a scoring depending on the prefered lenght and pace inputs from the user. This score then gets mutiplied with the cluster_strenght to determine a ranking. 
 3. For the **recomendation with rating** we simply multiply the cluster_strenght of each book with their rating (0-5) divided by 5.
 
-### Graphs generated
+### Cluster analysis
 Here are some examples of graphs generated in our bookwyrm_analysis.ipynb notebook for 7 and 20 clusters:
 
 #### 7 clusters
 ![7 clusters visualization](images/7_clusters.png)
+![7 cluster centers visualization](images/7_cluster_centers.png)
 #### 20 clusters
-
+![20 clusters visualization](images/20_clusters.png)
+![20 cluster centers visualization](images/20_cluster_centers.png)
 ## 4. Demonstration
 
 We conducted several interviews with different people, mostly people from which we knew do read fantasy books (7 interviews 14.12.2025). Those interviews can be found under INTERVIEW.md.
