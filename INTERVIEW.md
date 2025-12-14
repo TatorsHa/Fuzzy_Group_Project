@@ -10,8 +10,6 @@
 6. What do you think about the selecetion of moods? Is it too overwhelming? Is something missing?
 7. What cluster amount was the best for you?
 
-Note down the user inputs for searching.
-
 ## User 1
 1. non
 2. oui
