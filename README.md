@@ -76,8 +76,8 @@ An interactive jupyter notebook was created to test our artefact.
 Setup:<br>
 1. We create fuzzy clusters with the moods from the books from the database. The algorithm uses an fpc test to determine the optimal amount of clusters (user testing showed that while this is theoretically optimal, for the user experience more clusters seem more interesting).
 2. The mood input from the user are then fitted into the cluster to determine from which fuzzy cluster the suggestions should be generated. This return a list of all the books with an assigned cluster_strenght to how well they fit with the user input vector.
-2. For the recomendation with rules we use fuzzy rules to give the books a scoring depending on the prefered lenght and pace inputs from the user. This score then gets mutiplied with the cluster_strenght to determine a ranking. 
-3. For the recomendation with rating we simply multiply the cluster_strenght of each book with their rating divided by 5.
+2. For the **recomendation with rules** we use fuzzy rules to give the books a scoring depending on the prefered lenght and pace inputs from the user. This score then gets mutiplied with the cluster_strenght to determine a ranking. 
+3. For the **recomendation with rating** we simply multiply the cluster_strenght of each book with their rating divided by 5.
 
 
 ## 4. Demonstration
