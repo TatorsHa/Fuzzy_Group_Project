@@ -82,6 +82,12 @@ Setup:<br>
 2. For the **recomendation with rules** we use fuzzy rules to give the books a scoring depending on the prefered lenght and pace inputs from the user. This score then gets mutiplied with the cluster_strenght to determine a ranking. 
 3. For the **recomendation with rating** we simply multiply the cluster_strenght of each book with their rating (0-5) divided by 5.
 
+### Graphs generated
+Here are some examples of graphs generated in our bookwyrm_analysis.ipynb notebook for 7 and 20 clusters:
+
+#### 7 clusters
+![7 clusters visualization](images/7_clusters.png)
+#### 20 clusters
 
 ## 4. Demonstration
 
